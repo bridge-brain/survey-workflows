@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KI-Readiness Assessment – bridgebrain</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+
+<div class="max-w-2xl mx-auto px-4 py-10">
+
+  <!-- Brand -->
+  <div class="mb-8">
+    <p class="text-xs font-semibold text-blue-600 uppercase tracking-widest mb-1">bridgebrain</p>
+    <h1 class="text-2xl font-bold text-slate-900">KI-Readiness Assessment</h1>
+  </div>
+
+  <!-- Progress -->
+  <div class="mb-8">
+    <div class="flex justify-between text-xs text-slate-400 mb-1.5">
+      <span id="progress-label">Einleitung</span>
+      <span id="progress-steps">Schritt 1 von 5</span>
+    </div>
+    <div class="h-1 bg-slate-200 rounded-full overflow-hidden">
+      <div id="progress-bar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Card -->
+  <div class="bg-white rounded-2xl shadow-sm border border-slate-200">
+    <div class="p-8" id="step-content"></div>
+    <div class="px-8 pb-8 flex items-center">
+      <button id="btn-back" class="text-slate-400 text-sm hover:text-slate-600 transition-colors hidden" onclick="navigate(-1)">← Zurück</button>
+      <div class="flex-1"></div>
+      <button id="btn-next" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors" onclick="navigate(1)">Weiter →</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Konfiguration ───────────────────────────────────────────────────────────
+const WEBHOOK_URL = 'https://n8n.bridge-brain.ai/webhook/5414984a-7cca-4ff4-9d28-000a53747ceb';
+
+// ─── URL-Parameter ───────────────────────────────────────────────────────────
+const _params       = new URLSearchParams(window.location.search);
+const SURVEY_ID     = _params.get('survey') || '';
+const RESPONDENT_ID = _params.get('respondent') || '';
+
+// ─── Daten ───────────────────────────────────────────────────────────────────
+const DIMENSIONS = [
+  { name: 'Markt & Strategie',         intro: 'Wie strategisch und bewusst geht Ihr Unternehmen das Thema KI an?' },
+  { name: 'Use Cases',                 intro: 'Wie konkret und weit sind Ihre KI-Initiativen bereits?' },
+  { name: 'Menschen & Kompetenzen',    intro: 'Wie ist Ihr Team für KI aufgestellt – in Wissen, Haltung und Struktur?' },
+  { name: 'Technologie & Architektur', intro: 'Wie gut ist Ihre technische Basis für KI-Anwendungen gerüstet?' },
+];
+
+const QUESTIONS = [
+  { id:'f1',  dim:0, w:1.0, q:'Hat Ihr Unternehmen eine definierte KI-Strategie oder einen konkreten Plan für den KI-Einsatz?',
+    opts:[{t:'KI ist bei uns noch kein strategisches Thema.',v:0},{t:'Wir beschäftigen uns gelegentlich damit, aber ohne konkreten Plan.',v:25},{t:'KI steht auf unserer Agenda – erste Überlegungen laufen.',v:50},{t:'Wir haben konkrete Ziele und erste Maßnahmen definiert.',v:75},{t:'Wir haben eine dokumentierte KI-Strategie mit klaren Verantwortlichkeiten und Roadmap.',v:100}]},
+  { id:'f2',  dim:0, w:1.0, q:'Wie aktiv treibt die Geschäftsführung KI-Initiativen voran?',
+    opts:[{t:'Die Geschäftsführung sieht KI aktuell nicht als relevantes Thema.',v:0},{t:'KI wird zur Kenntnis genommen, aber nicht aktiv verfolgt.',v:25},{t:'Die Geschäftsführung ist offen und signalisiert Bereitschaft.',v:50},{t:'KI-Initiativen werden aktiv gefördert und mit Ressourcen unterstützt.',v:75},{t:'Die Geschäftsführung treibt KI strategisch voran und ist persönlich involviert.',v:100}]},
+  { id:'f3',  dim:0, w:0.3, reflection:true, q:'Wie gut kennen Sie die digitalen Erwartungen und Schmerzpunkte Ihrer Kunden?',
+    opts:[{t:'Das haben wir noch nie systematisch betrachtet.',v:0},{t:'Wir haben ein grobes Gefühl, aber keine konkreten Erkenntnisse.',v:25},{t:'Wir kennen einige Bedürfnisse aus dem direkten Kundenkontakt.',v:50},{t:'Wir haben strukturierte Einblicke aus Befragungen oder Analysen.',v:75},{t:'Wir haben ein detailliertes Bild der Kundenerwartungen und leiten daraus aktiv Maßnahmen ab.',v:100}]},
+  { id:'f4',  dim:0, w:0.3, reflection:true, q:'Wie intensiv beschäftigen Sie sich mit KI-Risiken und -Chancen für Ihr Geschäftsmodell?',
+    opts:[{t:'Das haben wir noch nicht systematisch betrachtet.',v:0},{t:'Wir haben das Thema auf dem Radar, aber ohne tiefere Analyse.',v:25},{t:'Wir haben uns in Grundzügen damit befasst.',v:50},{t:'Wir haben konkrete Chancen und Risiken identifiziert und diskutiert.',v:75},{t:'Wir haben eine strukturierte Analyse durchgeführt und daraus strategische Schlussfolgerungen gezogen.',v:100}]},
+  { id:'f5',  dim:0, w:0.3, reflection:true, q:'Wie systematisch beobachten Sie KI-Entwicklungen in Ihrer Branche?',
+    opts:[{t:'Wir verfolgen das kaum bis gar nicht.',v:0},{t:'Wir nehmen Entwicklungen passiv wahr, wenn sie uns begegnen.',v:25},{t:'Wir verfolgen relevante Entwicklungen regelmäßig, aber ohne festes System.',v:50},{t:'Wir beobachten KI-Trends aktiv und tauschen uns intern darüber aus.',v:75},{t:'Wir haben einen strukturierten Prozess zur KI-Markt- und Wettbewerbsbeobachtung.',v:100}]},
+  { id:'f6',  dim:1, w:1.0, q:'Haben Sie konkrete KI-Anwendungsfälle identifiziert und priorisiert?',
+    opts:[{t:'Nein, wir haben noch keine konkreten Use Cases identifiziert.',v:0},{t:'Wir haben vage Ideen, aber nichts Konkretes oder Priorisiertes.',v:25},{t:'Wir haben einige Use Cases gesammelt, aber noch nicht strukturiert bewertet.',v:50},{t:'Wir haben eine Liste konkreter Use Cases mit erster Priorisierung.',v:75},{t:'Wir haben eine strukturierte, priorisierte Use-Case-Pipeline mit klaren Kriterien.',v:100}]},
+  { id:'f7',  dim:1, w:1.0, q:'Wie weit sind Ihre KI-Ideen bereits in konkrete Umsetzung überführt?',
+    opts:[{t:'Noch nichts wurde umgesetzt oder aktiv gestartet.',v:0},{t:'Wir befinden uns in der Konzept- oder Planungsphase.',v:25},{t:'Mindestens ein Pilot oder Experiment ist in Arbeit.',v:50},{t:'Mindestens ein Use Case ist produktiv im Einsatz.',v:75},{t:'Mehrere KI-Lösungen laufen produktiv und werden kontinuierlich weiterentwickelt.',v:100}]},
+  { id:'f8',  dim:1, w:1.0, q:'Gibt es in Ihrem Unternehmen bereits messbare Ergebnisse durch KI-Einsatz?',
+    opts:[{t:'Nein, wir haben noch keine KI produktiv im Einsatz.',v:0},{t:'KI wird genutzt, aber Ergebnisse werden nicht systematisch gemessen.',v:25},{t:'Wir sehen qualitative Verbesserungen, aber keine belastbaren Zahlen.',v:50},{t:'Wir haben messbare Effizienz- oder Qualitätsverbesserungen dokumentiert.',v:75},{t:'Wir haben klare, quantifizierte Ergebnisse (Zeit, Kosten, Umsatz) und nutzen sie zur Steuerung.',v:100}]},
+  { id:'f9',  dim:1, w:0.6, q:'Wie systematisch gehen Sie beim Identifizieren und Bewerten von KI-Ideen vor?',
+    opts:[{t:'Wir haben keinen Prozess – Ideen entstehen zufällig, wenn überhaupt.',v:0},{t:'Ideen kommen gelegentlich auf, werden aber nicht strukturiert weiterverfolgt.',v:25},{t:'Wir sammeln Ideen, haben aber noch kein klares Bewertungsschema.',v:50},{t:'Wir nutzen erste Kriterien (z.B. Aufwand, Nutzen) zur Bewertung von KI-Ideen.',v:75},{t:'Wir haben einen etablierten Prozess: von der Idee über die Bewertung bis zur Entscheidung.',v:100}]},
+  { id:'f10', dim:2, w:1.0, q:'Wie gut sind Ihre Mitarbeiter in der Lage, KI-Tools sinnvoll im Arbeitsalltag einzusetzen?',
+    opts:[{t:'KI-Tools werden kaum bis gar nicht genutzt.',v:0},{t:'Einzelne Mitarbeiter experimentieren privat, aber nicht im Arbeitskontext.',v:25},{t:'Einige Mitarbeiter nutzen KI-Tools gelegentlich, weitgehend selbst beigebracht.',v:50},{t:'Ein relevanter Teil des Teams setzt KI-Tools regelmäßig und produktiv ein.',v:75},{t:'KI-Tools sind im Arbeitsalltag vieler Mitarbeiter fest etabliert und werden gezielt eingesetzt.',v:100}]},
+  { id:'f11', dim:2, w:1.0, q:'Wie offen und experimentierfreudig ist Ihr Team gegenüber neuen KI-Werkzeugen?',
+    opts:[{t:'Es gibt spürbare Skepsis oder Zurückhaltung gegenüber KI im Team.',v:0},{t:'Die Stimmung ist neutral – weder Begeisterung noch Widerstand.',v:25},{t:'Interesse ist vorhanden, aber Eigeninitiative bleibt die Ausnahme.',v:50},{t:'Das Team probiert aktiv neue Tools aus und teilt Erfahrungen.',v:75},{t:'Eine echte Experimentierkultur ist vorhanden – Neues wird begeistert angenommen und gemeinsam weiterentwickelt.',v:100}]},
+  { id:'f12', dim:2, w:1.0, q:'Wie klar ist geregelt, wer KI-Initiativen in Ihrem Unternehmen koordiniert und verantwortet?',
+    opts:[{t:'Es gibt keine klare Zuständigkeit – KI ist Chefsache oder niemandens Sache.',v:0},{t:'Das Thema liegt implizit bei einzelnen Personen, aber ohne formale Rolle.',v:25},{t:'Es gibt eine informelle Ansprechperson, aber keine definierte Verantwortung.',v:50},{t:'Eine Person oder Funktion ist erkennbar für KI-Themen zuständig.',v:75},{t:'Es gibt eine klar definierte Rolle mit Mandat, Ressourcen und Reporting.',v:100}]},
+  { id:'f13', dim:3, w:1.0, q:'Wie zugänglich, strukturiert und verlässlich sind die relevanten Daten in Ihrem Unternehmen?',
+    opts:[{t:'Daten sind verstreut, schwer zugänglich oder von zweifelhafter Qualität.',v:0},{t:'Einige Daten sind vorhanden, aber nicht strukturiert oder zuverlässig nutzbar.',v:25},{t:'Die wichtigsten Daten sind zugänglich, aber Qualität und Vollständigkeit variieren.',v:50},{t:'Relevante Daten sind weitgehend strukturiert, aktuell und intern gut nutzbar.',v:75},{t:'Daten sind systematisch erfasst, qualitätsgesichert und für Analysen und KI-Anwendungen bereit.',v:100}]},
+  { id:'f14', dim:3, w:1.0, q:'Wie gut sind Ihre wichtigsten Systeme und Anwendungen miteinander vernetzt?',
+    opts:[{t:'Unsere Systeme arbeiten weitgehend isoliert – Daten werden manuell übertragen.',v:0},{t:'Es gibt punktuelle Verknüpfungen, aber keine durchgängige Integration.',v:25},{t:'Die wichtigsten Systeme sind teilweise vernetzt, Lücken bestehen noch.',v:50},{t:'Die meisten Kernsysteme sind integriert und tauschen Daten automatisch aus.',v:75},{t:'Unsere Systemlandschaft ist durchgängig vernetzt und ermöglicht nahtlose Datenflüsse.',v:100}]},
+  { id:'f15', dim:3, w:0.8, q:'Wie integrierbar und erweiterbar ist Ihre bestehende IT-Infrastruktur?',
+    opts:[{t:'Unsere Infrastruktur ist weitgehend starr – Erweiterungen sind aufwendig oder kaum möglich.',v:0},{t:'Erweiterungen sind möglich, erfordern aber erheblichen manuellen Aufwand.',v:25},{t:'Neue Tools lassen sich mit Aufwand integrieren, eine klare Strategie fehlt noch.',v:50},{t:'Unsere Infrastruktur ist modular aufgebaut und lässt sich gut erweitern.',v:75},{t:'Wir haben eine flexible, API-fähige Infrastruktur, die neue Tools schnell integrieren kann.',v:100}]},
+  { id:'f16', dim:3, w:0.8, q:'Wie stark nutzen Sie bereits cloudbasierte und KI-fähige Software?',
+    opts:[{t:'Wir nutzen überwiegend lokale Software ohne Cloud-Anbindung.',v:0},{t:'Wir nutzen vereinzelt Cloud-Dienste (z.B. E-Mail, Office), aber nicht strategisch.',v:25},{t:'Cloud-Software ist für einige Bereiche im Einsatz, KI-Funktionen kaum genutzt.',v:50},{t:'Wir setzen cloudbasierte Software breit ein und nutzen erste KI-Funktionen aktiv.',v:75},{t:'Cloud-first ist unser Standard – KI-Funktionen sind in unserem Software-Stack fest verankert.',v:100}]},
+];
+
+// ─── State ───────────────────────────────────────────────────────────────────
+let currentStep = 0; // 0 = Intro, 1–4 = Dimensionen
+const answers = {};
+
+// ─── Score-Berechnung ────────────────────────────────────────────────────────
+function calculateScores() {
+  const dimScores = {};
+  let totalW = 0, totalWV = 0;
+  DIMENSIONS.forEach((d, di) => {
+    const qs = QUESTIONS.filter(q => q.dim === di);
+    let dW = 0, dWV = 0;
+    qs.forEach(q => {
+      const v = answers[q.id] ?? 0;
+      dW += q.w; dWV += v * q.w;
+      totalW += q.w; totalWV += v * q.w;
+    });
+    dimScores[d.name] = Math.round(dWV / dW);
+  });
+  return { gesamt: Math.round(totalWV / totalW), dimensionen: dimScores };
+}
+
+function getEinordnung(score) {
+  if (score <= 25) return 'KI-Einsteiger';
+  if (score <= 50) return 'KI-Erkunder';
+  if (score <= 75) return 'KI-Anwender';
+  return 'KI-Vorreiter';
+}
+
+// ─── Rendering ───────────────────────────────────────────────────────────────
+function renderStep() {
+  const content  = document.getElementById('step-content');
+  const btnBack  = document.getElementById('btn-back');
+  const btnNext  = document.getElementById('btn-next');
+  const bar      = document.getElementById('progress-bar');
+  const label    = document.getElementById('progress-label');
+  const steps    = document.getElementById('progress-steps');
+
+  bar.style.width = `${(currentStep / 4) * 100}%`;
+  btnBack.classList.toggle('hidden', currentStep === 0);
+
+  if (currentStep === 0) {
+    label.textContent = 'Einleitung';
+    steps.textContent = 'Schritt 1 von 5';
+    btnNext.textContent = 'Assessment starten →';
+    content.innerHTML = `
+      <h2 class="text-xl font-bold text-slate-900 mb-3">Wo steht Ihr Unternehmen?</h2>
+      <p class="text-slate-600 text-sm mb-2">Dieses Assessment gibt Ihnen eine strukturierte Standortbestimmung in vier Dimensionen: Strategie, Use Cases, Mensch & Kompetenzen und Technologie.</p>
+      <p class="text-slate-600 text-sm mb-5">Es gibt keine richtigen oder falschen Antworten – wählen Sie die Option, die Ihre aktuelle Situation am besten beschreibt.</p>
+      <div class="flex gap-5 text-xs text-slate-500 mb-6">
+        <span>⏱ ca. 5–8 Minuten</span>
+        <span>📊 Score 0–100 am Ende</span>
+      </div>
+      <p class="text-xs text-slate-400 mb-7">Datenschutz: Ihre Angaben werden ausschließlich für die Workshop-Vorbereitung verwendet und nicht an Dritte weitergegeben.</p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Name *</label>
+          <input id="inp-name" type="text" value="${answers._name||''}" placeholder="Max Mustermann"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Unternehmen *</label>
+          <input id="inp-org" type="text" value="${answers._org||''}" placeholder="ACME GmbH"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Funktion <span class="text-slate-400 font-normal">(optional)</span></label>
+          <input id="inp-role" type="text" value="${answers._role||''}" placeholder="Geschäftsführer"
+            class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-200">
+        </div>
+      </div>
+      <p id="err" class="text-red-500 text-xs mt-3 hidden">Bitte füllen Sie Name und Unternehmen aus.</p>
+    `;
+  } else {
+    const di  = currentStep - 1;
+    const dim = DIMENSIONS[di];
+    const qs  = QUESTIONS.filter(q => q.dim === di);
+    label.textContent = dim.name;
+    steps.textContent = `Schritt ${currentStep + 1} von 5`;
+    btnNext.textContent = currentStep === 4 ? 'Absenden' : 'Weiter →';
+
+    content.innerHTML = `
+      <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">${dim.name}</p>
+      <p class="text-slate-500 text-sm mb-7">${dim.intro}</p>
+      <div class="space-y-8">
+        ${qs.map(q => `
+          <div>
+            <div class="flex gap-2.5 mb-3">
+              <span class="text-xs font-mono text-slate-400 mt-0.5 flex-shrink-0">F${QUESTIONS.indexOf(q)+1}</span>
+              <div>
+                <p class="text-sm font-medium text-slate-800 leading-snug">${q.q}</p>
+                ${q.reflection ? `<p class="text-xs text-slate-400 mt-1 italic">Denkanstoß – kein objektives Richtig/Falsch</p>` : ''}
+              </div>
+            </div>
+            <div class="space-y-2 ml-6">
+              ${q.opts.map(opt => `
+                <label class="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors
+                  ${answers[q.id] === opt.v ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:bg-slate-50'}">
+                  <input type="radio" name="${q.id}" value="${opt.v}"
+                    ${answers[q.id] === opt.v ? 'checked' : ''}
+                    onchange="selectAnswer('${q.id}', ${opt.v})"
+                    class="mt-0.5 accent-blue-600 flex-shrink-0">
+                  <span class="text-sm text-slate-700 leading-snug">${opt.t}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <p id="err" class="text-red-500 text-xs mt-5 hidden">Bitte beantworten Sie alle Fragen in diesem Abschnitt.</p>
+    `;
+  }
+}
+
+function selectAnswer(qId, value) {
+  answers[qId] = value;
+  document.querySelectorAll(`[name="${qId}"]`).forEach(radio => {
+    const label = radio.closest('label');
+    const selected = parseInt(radio.value) === value;
+    label.classList.toggle('border-blue-400', selected);
+    label.classList.toggle('bg-blue-50', selected);
+    label.classList.toggle('border-slate-200', !selected);
+  });
+}
+
+// ─── Validierung ─────────────────────────────────────────────────────────────
+function validate() {
+  const err = document.getElementById('err');
+  if (currentStep === 0) {
+    const name = document.getElementById('inp-name').value.trim();
+    const org  = document.getElementById('inp-org').value.trim();
+    if (!name || !org) { err.classList.remove('hidden'); return false; }
+    answers._name = name;
+    answers._org  = org;
+    answers._role = document.getElementById('inp-role').value.trim();
+    return true;
+  }
+  const di = currentStep - 1;
+  const qs = QUESTIONS.filter(q => q.dim === di);
+  if (!qs.every(q => answers[q.id] !== undefined)) {
+    err.classList.remove('hidden'); return false;
+  }
+  return true;
+}
+
+// ─── Navigation ──────────────────────────────────────────────────────────────
+async function navigate(dir) {
+  if (dir === 1) {
+    if (!validate()) return;
+    if (currentStep === 4) { await submit(); return; }
+  }
+  currentStep = Math.max(0, Math.min(4, currentStep + dir));
+  renderStep();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─── Übermittlung ────────────────────────────────────────────────────────────
+async function submit() {
+  const scores  = calculateScores();
+  const payload = {
+    survey_id:     SURVEY_ID,
+    respondent_id: RESPONDENT_ID,
+    name:          answers._name,
+    unternehmen:   answers._org,
+    funktion:      answers._role || '',
+    datum:         new Date().toISOString().split('T')[0],
+    answers:     Object.fromEntries(
+      QUESTIONS.map(q => [q.id, {
+        value: answers[q.id],
+        text:  q.opts.find(o => o.v === answers[q.id])?.t ?? ''
+      }])
+    ),
+    scores,
+  };
+
+  // Ladescreen
+  document.getElementById('step-content').innerHTML = `
+    <div class="text-center py-14">
+      <div class="inline-block w-8 h-8 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+      <p class="text-slate-500 text-sm">Antworten werden übermittelt…</p>
+    </div>`;
+  document.getElementById('btn-back').classList.add('hidden');
+  document.getElementById('btn-next').classList.add('hidden');
+
+  try {
+    await fetch(WEBHOOK_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+
+    const einordnung = getEinordnung(scores.gesamt);
+    document.getElementById('progress-bar').style.width = '100%';
+    document.getElementById('step-content').innerHTML = `
+      <div class="text-center py-8">
+        <div class="text-4xl mb-5">✓</div>
+        <h2 class="text-xl font-bold text-slate-900 mb-2">Vielen Dank!</h2>
+        <p class="text-slate-500 text-sm mb-8">Ihre Antworten wurden übermittelt und werden für den Workshop ausgewertet.</p>
+        <div class="inline-block bg-blue-50 rounded-2xl px-8 py-5 text-center mb-6">
+          <p class="text-xs text-slate-400 mb-1">Ihr vorläufiger Score</p>
+          <p class="text-4xl font-bold text-blue-700 mb-1">${scores.gesamt}<span class="text-base font-normal text-slate-400"> / 100</span></p>
+          <p class="text-sm font-semibold text-slate-700">${einordnung}</p>
+        </div>
+        <p class="text-xs text-slate-400">Ihre Ergebnisse werden im Workshop gemeinsam besprochen.</p>
+      </div>`;
+  } catch (e) {
+    document.getElementById('step-content').innerHTML = `
+      <div class="text-center py-10">
+        <p class="text-red-500 text-sm mb-4">Übermittlung fehlgeschlagen. Bitte versuchen Sie es erneut.</p>
+        <button onclick="renderStep(); document.getElementById('btn-back').classList.remove('hidden'); document.getElementById('btn-next').classList.remove('hidden');"
+          class="text-blue-600 text-sm underline">Zurück zum Formular</button>
+      </div>`;
+    document.getElementById('btn-back').classList.remove('hidden');
+    document.getElementById('btn-next').classList.remove('hidden');
+  }
+}
+
+// ─── Start ───────────────────────────────────────────────────────────────────
+if (!SURVEY_ID) {
+  document.getElementById('step-content').innerHTML = `
+    <div class="text-center py-12">
+      <div class="text-3xl mb-4">🔗</div>
+      <h2 class="text-lg font-semibold text-slate-800 mb-2">Ungültiger Link</h2>
+      <p class="text-slate-500 text-sm">Dieser Link ist nicht gültig.<br>Bitte verwenden Sie den Link aus Ihrer Einladungs-E-Mail.</p>
+    </div>`;
+  document.getElementById('btn-next').classList.add('hidden');
+  document.getElementById('progress-bar').parentElement.parentElement.classList.add('hidden');
+} else {
+  renderStep();
+}
+</script>
+</body>
+</html>
