@@ -27,13 +27,9 @@
             },
             {
               "fieldLabel": "Vorlage",
-              "fieldType": "dropdown",
-              "fieldOptions": {
-                "values": [
-                  { "option": "ai-readiness-assessment-0" }
-                ]
-              },
-              "requiredField": true
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "z. B. ai-readiness-assessment-0"
             }
           ]
         },
