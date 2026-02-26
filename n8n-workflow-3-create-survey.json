@@ -1,0 +1,86 @@
+{
+  "name": "Survey erstellen",
+  "nodes": [
+    {
+      "id": "f1a2b3c4-d5e6-7890-a1b2-c3d4e5f60001",
+      "name": "Formular",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "webhookId": "c0de1234-5678-90ab-cdef-012345678901",
+      "parameters": {
+        "formTitle": "Survey erstellen",
+        "formDescription": "Neue Umfrage-Instanz anlegen. Nach dem Absenden erscheint der fertige Survey-Link.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Beschreibung",
+              "fieldType": "text",
+              "requiredField": true,
+              "placeholder": "z. B. KI-Workshop März 2026 – ACME GmbH"
+            },
+            {
+              "fieldLabel": "Kommentar",
+              "fieldType": "text",
+              "requiredField": false,
+              "placeholder": "z. B. Pilotunternehmen Gruppe A"
+            },
+            {
+              "fieldLabel": "Vorlage",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "ai-readiness-assessment-0" }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "f1a2b3c4-d5e6-7890-a1b2-c3d4e5f60002",
+      "name": "Survey anlegen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [490, 300],
+      "parameters": {
+        "jsCode": "const { randomUUID } = require('crypto');\nconst fs = require('fs');\n\n// ─── HIER ANPASSEN ──────────────────────────────────────────\nconst surveysPath = '/data/surveys.json';\nconst baseUrl     = 'https://survey.bridge-brain.ai';\n// ────────────────────────────────────────────────────────────\n\nconst beschreibung = ($input.first().json['Beschreibung'] ?? '').trim();\nconst kommentar    = ($input.first().json['Kommentar']    ?? '').trim();\nconst vorlage      = ($input.first().json['Vorlage']      ?? '').trim();\n\nconst newId = randomUUID();\n\nlet surveys = [];\nif (fs.existsSync(surveysPath)) {\n  surveys = JSON.parse(fs.readFileSync(surveysPath, 'utf8'));\n}\n\nsurveys.push({\n  id:          newId,\n  template:    vorlage,\n  description: beschreibung,\n  comments:    kommentar,\n  created:     new Date().toISOString().split('T')[0],\n});\n\nfs.writeFileSync(surveysPath, JSON.stringify(surveys, null, 2), 'utf8');\n\nreturn [{ json: {\n  success:     true,\n  id:          newId,\n  url:         `${baseUrl}/${vorlage}.html?survey=${newId}`,\n  description: beschreibung,\n  template:    vorlage,\n} }];"
+      }
+    },
+    {
+      "id": "f1a2b3c4-d5e6-7890-a1b2-c3d4e5f60003",
+      "name": "Antwort",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [730, 300],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ '✅ Survey angelegt!\\n\\nLink:\\n' + $json.url + '\\n\\nID: ' + $json.id + '\\nVorlage: ' + $json.template + '\\nBeschreibung: ' + $json.description }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "values": [
+              { "name": "Content-Type", "value": "text/plain; charset=utf-8" }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Formular": {
+      "main": [[{ "node": "Survey anlegen", "type": "main", "index": 0 }]]
+    },
+    "Survey anlegen": {
+      "main": [[{ "node": "Antwort", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

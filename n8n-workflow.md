@@ -40,6 +40,7 @@ const responsesPath = '/data/responses.json'; // ← anpassen
 [
   {
     "id": "550e8400-e29b-41d4-a716-446655440000",
+    "template": "ai-readiness-assessment-0",
     "description": "KI-Workshop Februar 2026",
     "comments": "Erstes Pilotunternehmen",
     "created": "2026-02-01",
@@ -52,6 +53,7 @@ const responsesPath = '/data/responses.json'; // ← anpassen
 ```
 
 - `id` – UUID des Surveys (kommt als `?survey=` URL-Parameter)
+- `template` – Name der HTML-Vorlage (ohne `.html`), z. B. `ai-readiness-assessment-0`; bestimmt die URL `/<template>.html?survey=<id>`
 - `respondents` – optionale Whitelist; wenn vorhanden, wird `respondent_id` dagegen geprüft
 - Wenn `respondents` fehlt oder leer: jeder mit gültigem `survey_id` darf antworten
 
@@ -360,16 +362,16 @@ Nutzt den bestehenden Teams-Node in n8n.
 - [ ] Workflow 2 importieren (bleibt inaktiv – wird manuell ausgelöst)
 
 ### GitHub Pages
-- [ ] Repo: `https://github.com/bridge-brain/ai-readiness-assessment-0`
-- [ ] `index.html` und `CNAME` ins Repo pushen
+- [ ] Repo: `https://github.com/bridge-brain/survey-workflows`
+- [ ] HTML-Vorlagen und `CNAME` ins Repo pushen
 - [ ] GitHub Pages aktivieren: Settings → Pages → Branch: `main`, Folder: `/ (root)`
-- [ ] DNS: CNAME-Eintrag `ai-assessment` → `bridge-brain.github.io` beim DNS-Provider setzen
-- [ ] Nach DNS-Propagation (~15 min): `https://ai-assessment.bridge-brain.ai` aufrufen
+- [ ] DNS: CNAME-Eintrag `survey` → `bridge-brain.github.io` beim DNS-Provider setzen
+- [ ] Nach DNS-Propagation (~15 min): `https://survey.bridge-brain.ai` aufrufen
 
 ### Erster Survey
-- [ ] UUID generieren (z. B. https://www.uuidgenerator.net/)
-- [ ] Eintrag in `surveys.json` anlegen
-- [ ] Test-Link: `https://ai-assessment.bridge-brain.ai?survey=<UUID>`
+- [ ] Workflow 3 importieren und aktivieren, Formular-URL notieren
+- [ ] Im Formular: Beschreibung, Kommentar und Vorlage ausfüllen → Survey wird automatisch angelegt
+- [ ] Test-Link aus der Formular-Antwort kopieren: `https://survey.bridge-brain.ai/<vorlage>.html?survey=<UUID>`
 - [ ] Formular ausfüllen und absenden
 - [ ] `responses.json` auf dem Server prüfen
 - [ ] Workflow 2 manuell mit der Survey-UUID triggern
