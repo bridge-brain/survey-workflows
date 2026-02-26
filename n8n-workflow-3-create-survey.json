@@ -33,8 +33,7 @@
             }
           ]
         },
-        "responseMode": "responseNode",
-        "options": {}
+        "responseMode": "responseNode"
       }
     },
     {
@@ -55,15 +54,7 @@
       "position": [730, 300],
       "parameters": {
         "respondWith": "text",
-        "responseBody": "={{ '✅ Survey angelegt!\\n\\nLink:\\n' + $json.url + '\\n\\nID: ' + $json.id + '\\nVorlage: ' + $json.template + '\\nBeschreibung: ' + $json.description }}",
-        "options": {
-          "responseCode": 200,
-          "responseHeaders": {
-            "values": [
-              { "name": "Content-Type", "value": "text/plain; charset=utf-8" }
-            ]
-          }
-        }
+        "responseBody": "={{ '✅ Survey angelegt!\\n\\nLink:\\n' + $json.url + '\\n\\nID: ' + $json.id + '\\nVorlage: ' + $json.template + '\\nBeschreibung: ' + $json.description }}"
       }
     }
   ],
